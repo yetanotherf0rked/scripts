@@ -16,3 +16,8 @@ A wrapper for cat that prefixes each file's contents with a header showing the f
 
 **Usage:** xcat [FILE]...
        Example: xcat *.py
+
+## gluetun
+A wrapper for gluetun and NordVPN.
+
+Usage: gluetun.sh <http|socks5> [-p <port>:1080] [-c <country>:Netherlands]
