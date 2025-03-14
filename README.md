@@ -20,4 +20,5 @@ A wrapper for cat that prefixes each file's contents with a header showing the f
 ## gluetun
 A wrapper for gluetun and NordVPN.
 
-Usage: gluetun.sh <http|socks5> [-p <port>:1080] [-c <country>:Netherlands]
+Usage: gluetun <http|socks5> [-p <port>:1080] [-c <country>:Netherlands]
+       gluetun --clean (to clean docker containers and sslocal clients)

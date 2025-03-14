@@ -3,11 +3,10 @@
 # gluetun.sh
 #
 # Description:
-#   A Bash script to run a gluetun docker container as either an HTTP or a
+#   A Bash script to run the gluetun Docker container as either an HTTP or a
 #   Socks5 proxy. In HTTP mode, the container exposes an HTTP proxy on a given
 #   port. In Socks5 mode, the container runs a Shadowsocks server on a random
 #   host port while sslocal connects to it and listens on a specified local port.
-#   Only works with NordVPN.
 #
 #   The script also provides a "--clean" option to remove all gluetun Docker
 #   containers and kill any running sslocal (Shadowsocks client) processes.
@@ -22,8 +21,7 @@
 #     - The Docker container's Shadowsocks server is exposed on a random host port.
 #     - sslocal connects to this random port and listens locally on the port
 #       specified by -p (default: 1080).
-#     - The script prints a simplified message and tests the proxy by showing
-#       the public IP obtained via the proxy.
+#     - The script tests the proxy by fetching the public IP via curl.
 #
 #   gluetun.sh --clean
 #     - Cleans up any running gluetun Docker containers and Shadowsocks clients.
@@ -35,13 +33,14 @@
 #
 # Environment Variables:
 #   - VPN_USER and VPN_PASSWORD must be set with your VPN credentials.
+#   - Optionally, SHADOWSOCKS_CIPHER can be set. Defaults to "chacha20-ietf-poly1305".
 #
 ################################################################################
 
 gluetun() {
 
     # If the first argument is --clean, perform cleanup and exit.
-    if [[ "$1" == "clean" ]]; then
+    if [[ "$1" == "--clean" ]]; then
         echo "Cleaning up gluetun containers and Shadowsocks clients..."
         # Remove all Docker containers with names starting with "gluetun_"
         docker rm -f $(docker ps -a -q --filter "name=gluetun_") 2>/dev/null
@@ -157,16 +156,30 @@ gluetun() {
         fi
 
         # Start sslocal to connect to the Shadowsocks server on the random host port.
-        # -p: port on the server (randomly assigned)
-        # -l: local listening port (set by -p option for socks5 mode)
+        set +m
         sslocal -s 127.0.0.1 -p "$host_port" -l "$port_socks5" \
                  -k "$shadowsocks_password" -m "$shadowsocks_cipher" \
                  --fast-open > /dev/null 2>&1 &
-        echo "Socks5 client running on port socks5://localhost:$port_socks5"
-        # Test the proxy by fetching the public IP
-        local proxy_ip
-        proxy_ip=$(curl --socks5 127.0.0.1:"$port_socks5" -s https://api.ipify.org)
-        echo "$proxy_ip"
+
+        # Wait a few seconds for sslocal to initialize.
+        sleep 5
+
+        # Test the proxy by fetching the public IP via the socks5 proxy.
+        local proxy_ip=""
+        for i in {1..10}; do
+            proxy_ip=$(curl --socks5 127.0.0.1:"$port_socks5" -s https://api.ipify.org)
+            if [[ -n "$proxy_ip" ]]; then
+                break
+            fi
+            sleep 1
+        done
+
+        if [[ -n "$proxy_ip" ]]; then
+            echo "Socks5 client running on port socks5://localhost:$port_socks5"
+            echo "IP: $proxy_ip"
+        else
+            echo "Error: The Socks5 proxy did not return a public IP address."
+        fi
     else
         echo "Invalid proxy type. Use 'http' or 'socks5'."
         return 1
